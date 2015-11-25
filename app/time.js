@@ -1,5 +1,6 @@
 var Joi = require("joi");
 var moment = require("moment");
+var Entry = require("./models/entry");
 
 module.exports = function (server) {
   server.route({
@@ -17,24 +18,22 @@ module.exports = function (server) {
       }
     },
     handler: function (request, reply) {
-      var requestedOffset = moment.parseZone(request.payload.started_at_timestamp).utcOffset();
-      var startedAt = moment(request.payload.started_at_timestamp, moment.ISO_8601).utcOffset(requestedOffset);
-      var endedAt = request.payload.ended_at_timestamp ? moment(request.payload.ended_at_timestamp, moment.ISO_8601).utcOffset(requestedOffset) : null;
-      var now = request.headers["request-date"] ? moment.utc(request.headers["request-date"], "ddd, D MMM YYYY HH:mm:ss \\G\\M\\T") : moment();
+      var clientDate;
+      var entry = new Entry({
+        started_at_timestamp: request.payload.started_at_timestamp,
+        ended_at_timestamp: request.payload.ended_at_timestamp
+      });
 
-      if (!now.isValid()) {
-        now = moment();
+      if (request.headers["request-date"]) {
+        clientDate = moment
+          .utc(request.headers["request-date"], "ddd, D MMM YYYY HH:mm:ss \\G\\M\\T");
       }
 
-      now.utcOffset(requestedOffset);
-
       reply({
-        spent_at: startedAt.format("YYYY-MM-DD"),
-        started_at: startedAt.format("h:mma"),
-        ended_at: endedAt ? endedAt.format("h:mma") : null,
-        hours: endedAt ?
-          +endedAt.diff(startedAt, "hours", true).toFixed(2) :
-          +now.diff(startedAt, "hours", true).toFixed(2),
+        spent_at: entry.spentAt(),
+        started_at: entry.startedAt(),
+        ended_at: entry.endedAt(),
+        hours: entry.hours(clientDate)
       });
     }
   });
